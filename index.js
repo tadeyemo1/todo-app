@@ -1,72 +1,66 @@
-const express = require('express');
+const express = require("express");
+const { Pool } = require("pg");
+const cors = require("cors");
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-const Database = require('better-sqlite3');
-const db = new Database('todos.db');
-
-// Middleware to handle JSON
+app.use(cors());
 app.use(express.json());
+app.use(express.static("public"));
 
-// Serve frontend files
-app.use(express.static('public'));
-
-// Create table if it doesn't exist
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS todos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task TEXT,
-    completed INTEGER DEFAULT 0
-  )
-`).run();
-
-
-let id = 1;
-
-// Get all todos
-app.get('/todos', (req, res) => {
-    const todos = db.prepare('SELECT * FROM todos').all();
-    res.json(todos);
-  });
-  
-  app.post('/todos', (req, res) => {
-    const { task } = req.body;
-    const info = db.prepare('INSERT INTO todos (task) VALUES (?)').run(task);
-    const newTodo = { id: info.lastInsertRowid, task };
-    res.status(201).json(newTodo);
-  });
-  
-  app.delete('/todos/:id', (req, res) => {
-    const { id } = req.params;
-    const result = db.prepare('DELETE FROM todos WHERE id = ?').run(id);
-  
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Task not found.' });
-    }
-  
-    res.status(204).end(); // No content
-  });
-
-  // Toggle complete/uncomplete
-app.put('/todos/:id/complete', (req, res) => {
-  const { id } = req.params;
-
-  // Get the current status
-  const current = db.prepare('SELECT completed FROM todos WHERE id = ?').get(id);
-
-  if (!current) {
-    return res.status(404).json({ error: 'Task not found.' });
-  }
-
-  // Toggle 1 to 0 or 0 to 1
-  const newStatus = current.completed === 1 ? 0 : 1;
-
-  db.prepare('UPDATE todos SET completed = ? WHERE id = ?').run(newStatus, id);
-
-  res.status(200).json({ message: 'Task completion status toggled.' });
+// Replace this with your Supabase connection string
+const pool = new Pool({
+  connectionString: "postgres://tadeyemo1:[P5Jg#M9kq$#JFrAy]@db.dcvoqsbzlawdddyhmkjt.supabase.co:5432/postgres",
+  ssl: { rejectUnauthorized: false } // Required by Supabase
 });
 
-  
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-  });
+// Test route
+app.get("/ping", (req, res) => {
+  res.send("pong");
+});
+
+// Get all todos
+app.get("/todos", async (req, res) => {
+  const result = await pool.query("SELECT * FROM todos ORDER BY id DESC");
+  res.json(result.rows);
+});
+
+// Add a new todo
+app.post("/todos", async (req, res) => {
+  const { task } = req.body;
+  await pool.query("INSERT INTO todos (task) VALUES ($1)", [task]);
+  res.status(201).json({ message: "Todo added" });
+});
+
+// Toggle completed
+app.put("/todos/:id/complete", async (req, res) => {
+  const { id } = req.params;
+  const result = await pool.query("SELECT completed FROM todos WHERE id = $1", [id]);
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+  const newStatus = !result.rows[0].completed;
+  await pool.query("UPDATE todos SET completed = $1 WHERE id = $2", [newStatus, id]);
+  res.status(200).json({ message: "Todo toggled" });
+});
+
+// Edit a todo
+app.put("/todos/:id", async (req, res) => {
+  const { id } = req.params;
+  const { task } = req.body;
+  await pool.query("UPDATE todos SET task = $1 WHERE id = $2", [task, id]);
+  res.status(200).json({ message: "Todo updated" });
+});
+
+// Delete a todo
+app.delete("/todos/:id", async (req, res) => {
+  const { id } = req.params;
+  await pool.query("DELETE FROM todos WHERE id = $1", [id]);
+  res.status(200).json({ message: "Todo deleted" });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
