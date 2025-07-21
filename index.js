@@ -11,7 +11,8 @@ app.use(express.static("public"));
 
 // Replace this with your Supabase connection string
 const pool = new Pool({
-  connectionString: "postgres://tadeyemo1:[P5Jg#M9kq$#JFrAy]@db.dcvoqsbzlawdddyhmkjt.supabase.co:5432/postgres",
+  connectionString: connectionString: process.env.DATABASE_URL
+  ,
   ssl: { rejectUnauthorized: false } // Required by Supabase
 });
 
