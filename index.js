@@ -11,7 +11,7 @@ app.use(express.static("public"));
 
 // Replace this with your Supabase connection string
 const pool = new Pool({
-  connectionString: connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false } // Required by Supabase
 });
 
